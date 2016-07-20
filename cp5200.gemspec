@@ -1,4 +1,4 @@
-require_relative '../lib/cp5200/version'
+require_relative 'lib/cp5200/version'
 
 Gem::Specification.new do |s|
   s.name        = 'cp5200'
@@ -15,5 +15,5 @@ Gem::Specification.new do |s|
   s.files        = Dir["{lib}/**/*.rb", "Gemfile", "*.md"]
   s.require_path = 'lib'
 
-  s.add_runtime_dependency 'bindata', "~> 2.3.0"
+  s.add_runtime_dependency 'bindata', '~> 2.3', '>= 2.3.0'
 end
