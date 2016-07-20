@@ -9,4 +9,7 @@ Gem::Specification.new do |s|
   s.files       = ["lib/cp5200.rb"]
   s.homepage    = 'https://github.com/gonzaloguerrero/cp5200'
   s.license     = 'MIT'
+
+  s.add_development_dependency 'bundler'
+  s.add_runtime_dependency 'bindata'
 end
