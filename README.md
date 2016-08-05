@@ -6,7 +6,7 @@
 require 'cairo'
 require 'cp5200'
 
-LED_HEIGHT = 64
+LED_WIDTH = 64
 LED_HEIGHT = 32
 
 controller = CPower::LedController.new('5200', '192.168.1.222', 5200)
