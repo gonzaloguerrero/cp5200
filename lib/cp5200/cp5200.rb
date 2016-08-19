@@ -140,6 +140,8 @@ module CPower
     end
 
     def query_network_params
+      assert_socket
+
       request_packet = PacketBase.new(
         control_id: 0xFFFFFFFF,
         packet_data: {
@@ -150,6 +152,7 @@ module CPower
           sub_packet: QueryNetworkSettingsSubPacket.new.to_binary_s
         }
       )
+
       request_packet.write(@socket)
       response_packet = PacketBase.new
       response_packet.read(@socket)
@@ -171,19 +174,29 @@ private
       request_packet.write(@socket)
     end
 
+    def assert_socket
+      raise "Socket is not ready, call connect before sending any command" if @socket.nil?
+    end
+
 public
     def setup_windows(windows)
+      assert_socket
+
       sub_packet = SetWindowSubPacket.new(
         windows: windows )
       send_external_call_packet(sub_packet)
     end
 
     def set_window_text(args)
+      assert_socket
+
       sub_packet = SetWindowTextSubPacket.new(args)
       send_external_call_packet(sub_packet)
     end
 
     def set_window_image(args)
+      assert_socket
+
       sub_packet = SetWindowImageSubPacket.new(args)
       send_external_call_packet(sub_packet)
     end
