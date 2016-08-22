@@ -5,12 +5,13 @@ module CPower
   class QueryNetworkSettingsSubPacket < BinData::Record
     endian :little
 
-    COMMAND_CODE = 0X3C
-
     uint8 :query, value: 0x01
   end
 
   class PacketBase < BinData::Record
+    QUERY_NETWORK_SETTINGS_COMMAND_CODE = 0x3C
+    RESET_APP_COMMAND_CODE = 0xFE
+
     endian :little
     uint32 :control_id
     uint16 :network_data_length, value: lambda { packet_data.num_bytes + 2 }
@@ -68,7 +69,7 @@ module CPower
     uint8 :command_code, value: 0x01
 
     uint8 :number, value: lambda { windows.length }
-    array :windows, initial_length: :number do
+    array :windows do
       endian :little
 
       uint16 :x
@@ -125,6 +126,29 @@ module CPower
     string :image_data
   end
 
+  class ResetGlobalDisplayAreaSubPacket < BinData::Record
+    endian :little
+    uint8 :command_code, value: 0x0c
+
+    bit1 :save_to_flash, value: 1
+    bit7 :reserved1, value: 0
+
+    uint8 :number, value: 0
+
+    bit1 :synchronous, value: 1
+    bit7 :reserved2, value: 0
+
+    uint16 :retention, value: 0
+  end
+
+  class ClearFlashDataSubPacket < BinData::Record
+    endian :little
+    uint8 :command_code, value: 0x07
+
+    uint8 :clear_flash_flag, value: 1
+    skip length: 2
+  end
+
   class LedController
     def initialize(type, ip, port)
       @type, @ip, @port = type, ip, port
@@ -139,6 +163,26 @@ module CPower
       @socket.close
     end
 
+    def restart_app
+      assert_socket
+
+      request_packet = PacketBase.new(
+        control_id: 0xFFFFFFFF,
+        packet_data: {
+          packet_type: 0x68,
+          command_type: 0x32,
+          card_id: 0xFF,
+          command_code: PacketBase::RESET_APP_COMMAND_CODE,
+        }
+      )
+
+      request_packet.write(@socket)
+    end
+
+    def play_storied_program
+      send_external_call_packet(BinData::Uint8.new(0x6))
+    end
+
     def query_network_params
       assert_socket
 
@@ -148,7 +192,7 @@ module CPower
           packet_type: 0x68,
           command_type: 0x32,
           card_id: 0xFF,
-          command_code: QueryNetworkSettingsSubPacket::COMMAND_CODE,
+          command_code: PacketBase::QUERY_NETWORK_SETTINGS_COMMAND_CODE,
           sub_packet: QueryNetworkSettingsSubPacket.new.to_binary_s
         }
       )
@@ -172,6 +216,7 @@ private
         }
       )
       request_packet.write(@socket)
+      @socket.flush
     end
 
     def assert_socket
@@ -179,6 +224,14 @@ private
     end
 
 public
+
+    def reset_global_display_area
+      assert_socket
+
+      sub_packet = ResetGlobalDisplayAreaSubPacket.new
+      send_external_call_packet(sub_packet)
+    end
+
     def setup_windows(windows)
       assert_socket
 
@@ -198,6 +251,13 @@ public
       assert_socket
 
       sub_packet = SetWindowImageSubPacket.new(args)
+      send_external_call_packet(sub_packet)
+    end
+
+    def clear_flash_data
+      assert_socket
+
+      sub_packet = ClearFlashDataSubPacket.new
       send_external_call_packet(sub_packet)
     end
   end
