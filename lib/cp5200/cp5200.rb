@@ -65,13 +65,12 @@ module CPower
   end
 
   class SetWindowSubPacket < BinData::Record
-    endian :little
+    endian :big
     uint8 :command_code, value: 0x01
 
     uint8 :number, value: lambda { windows.length }
-    array :windows do
-      endian :little
-
+    array :windows, initial_length: :number do
+      endian :big
       uint16 :x
       uint16 :y
       uint16 :width
@@ -113,7 +112,7 @@ module CPower
   end
 
   class SetWindowImageSubPacket < BinData::Record
-    endian :little
+    endian :big
     uint8 :command_code, value: 0x03
     uint8 :window_number
     uint8 :mode
@@ -232,11 +231,10 @@ public
       send_external_call_packet(sub_packet)
     end
 
-    def setup_windows(windows)
+    def setup_windows(args)
       assert_socket
 
-      sub_packet = SetWindowSubPacket.new(
-        windows: windows )
+      sub_packet = SetWindowSubPacket.new( args )
       send_external_call_packet(sub_packet)
     end
 
@@ -259,6 +257,10 @@ public
 
       sub_packet = ClearFlashDataSubPacket.new
       send_external_call_packet(sub_packet)
+    end
+
+    def to_s
+      "CPower LedController #{@type}@#{@ip}:#{@port}"
     end
   end
 end
