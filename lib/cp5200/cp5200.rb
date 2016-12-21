@@ -148,6 +148,23 @@ module CPower
     skip length: 2
   end
 
+  class SelectPlayStoredProgramSubPacket < BinData::Record
+    endian :little
+    uint8 :command_code, value: 0x08
+
+    uint8 :options, value: 0
+
+    uint8 :number, value: lambda { programs.length }
+    array :programs, type: :uint8, initial_length: :number
+  end
+
+  class ExitEnterTemplateSubPacket < BinData::Record
+    endian :little
+    uint8 :command_code, value: 0x82
+
+    uint8 :in_out, value: 0
+  end
+
   class LedController
     def initialize(type, ip, port)
       @type, @ip, @port = type, ip, port
@@ -205,6 +222,8 @@ module CPower
 
 private
     def send_external_call_packet(sub_packet)
+      assert_socket
+
       request_packet = ExternalCallPacketBase.new(
         control_id: 0xFFFFFFFF,
         packet_data: {
@@ -225,37 +244,37 @@ private
 public
 
     def reset_global_display_area
-      assert_socket
-
       sub_packet = ResetGlobalDisplayAreaSubPacket.new
       send_external_call_packet(sub_packet)
     end
 
     def setup_windows(args)
-      assert_socket
-
       sub_packet = SetWindowSubPacket.new( args )
       send_external_call_packet(sub_packet)
     end
 
     def set_window_text(args)
-      assert_socket
-
       sub_packet = SetWindowTextSubPacket.new(args)
       send_external_call_packet(sub_packet)
     end
 
     def set_window_image(args)
-      assert_socket
-
       sub_packet = SetWindowImageSubPacket.new(args)
       send_external_call_packet(sub_packet)
     end
 
     def clear_flash_data
-      assert_socket
-
       sub_packet = ClearFlashDataSubPacket.new
+      send_external_call_packet(sub_packet)
+    end
+
+    def select_play_stored_program(args)
+      sub_packet = SelectPlayStoredProgramSubPacket.new(args)
+      send_external_call_packet(sub_packet)
+    end
+
+    def exit_enter_template_mode(args)
+      sub_packet = ExitEnterTemplateSubPacket.new(args)
       send_external_call_packet(sub_packet)
     end
 
