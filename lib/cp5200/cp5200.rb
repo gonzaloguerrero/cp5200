@@ -10,7 +10,8 @@ module CPower
 
   class PacketBase < BinData::Record
     QUERY_NETWORK_SETTINGS_COMMAND_CODE = 0x3C
-    RESET_APP_COMMAND_CODE = 0xFE
+    RESTART_APP_COMMAND_CODE = 0xFE
+    RESTART_HW_COMMAND_CODE = 0x2d
 
     endian :little
     uint32 :control_id
@@ -65,12 +66,13 @@ module CPower
   end
 
   class SetWindowSubPacket < BinData::Record
-    endian :big
+    endian :little
     uint8 :command_code, value: 0x01
 
     uint8 :number, value: lambda { windows.length }
     array :windows, initial_length: :number do
       endian :big
+
       uint16 :x
       uint16 :y
       uint16 :width
@@ -93,7 +95,7 @@ module CPower
   class SimpleImageFormat < BinData::Record
     endian :little
 
-    uint16 :identify, value: 0x3149
+    string :identify, value: 'I1'
 
     uint16 :width
     uint16 :height
@@ -102,25 +104,25 @@ module CPower
 
     skip length: 1
 
-    array :r, type: :uint8, initial_length: lambda { bytes_per_row * height }
-    array :g, type: :uint8, initial_length: lambda { bytes_per_row * height }
-    array :b, type: :uint8, initial_length: lambda { bytes_per_row * height }
+    array :r, type: :uint8, initial_length: lambda { size }
+    array :g, type: :uint8, initial_length: lambda { size }
+    array :b, type: :uint8, initial_length: lambda { size }
 
-    def bytes_per_row
-      (width / 8).ceil
+    def size
+      (height * width) >> 3
     end
   end
 
   class SetWindowImageSubPacket < BinData::Record
-    endian :big
+    endian :little
     uint8 :command_code, value: 0x03
     uint8 :window_number
     uint8 :mode
     uint8 :speed
     uint16 :stay_time
     uint8 :image_format
-    uint16 :x
-    uint16 :y
+    uint16be :x
+    uint16be :y
 
     string :image_data
   end
@@ -188,7 +190,25 @@ module CPower
           packet_type: 0x68,
           command_type: 0x32,
           card_id: 0xFF,
-          command_code: PacketBase::RESET_APP_COMMAND_CODE,
+          command_code: PacketBase::RESTART_APP_COMMAND_CODE,
+          sub_packet: 'APP!'
+        }
+      )
+
+      request_packet.write(@socket)
+    end
+
+    def restart_hw
+      assert_socket
+
+      request_packet = PacketBase.new(
+        control_id: 0xFFFFFFFF,
+        packet_data: {
+          packet_type: 0x68,
+          command_type: 0x32,
+          card_id: 0xFF,
+          command_code: PacketBase::RESTART_HW_COMMAND_CODE,
+          sub_packet: "\x00"
         }
       )
 
@@ -224,17 +244,36 @@ private
     def send_external_call_packet(sub_packet)
       assert_socket
 
-      request_packet = ExternalCallPacketBase.new(
-        control_id: 0xFFFFFFFF,
-        packet_data: {
-          packet_type: 0x68,
-          command_type: 0x32,
-          card_id: 0xFF,
-          sub_packet: sub_packet.to_binary_s
-        }
-      )
-      request_packet.write(@socket)
-      @socket.flush
+      portions = sub_packet.to_binary_s.bytes.each_slice(200)
+      last_packet_number = portions.size - 1
+
+      puts portions.to_a.flatten.map { |b| "%02x" % b } * ' '
+      puts '-' * 50
+
+      portions.each_with_index do |portion, idx|
+        request_packet = ExternalCallPacketBase.new(
+          control_id: 0xFFFFFFFF,
+          packet_data: {
+            packet_type: 0x68,
+            command_type: 0x32,
+            card_id: 0x01,
+            confirmation_mark: 1,
+            packet_number: idx,
+            last_packet_number: last_packet_number,
+            sub_packet: portion.pack("c*")
+          },
+
+        )
+        # request_packet.write(@socket)
+        @socket.write request_packet.to_binary_s
+        break unless receive_ack == 0
+      end
+    end
+
+    def receive_ack
+      response_packet = PacketBase.new
+      response_packet.read(@socket)
+      response_packet.packet_data.confirmation_mark
     end
 
     def assert_socket
