@@ -247,8 +247,8 @@ private
       portions = sub_packet.to_binary_s.bytes.each_slice(200)
       last_packet_number = portions.size - 1
 
-      puts portions.to_a.flatten.map { |b| "%02x" % b } * ' '
-      puts '-' * 50
+      # puts portions.to_a.flatten.map { |b| "%02x" % b } * ' '
+      # puts '-' * 50
 
       portions.each_with_index do |portion, idx|
         request_packet = ExternalCallPacketBase.new(
